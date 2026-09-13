@@ -80,6 +80,22 @@ def current_user():
     if not header.startswith("Bearer "):
         return None
     token = header.removeprefix("Bearer ").strip()
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        try:
+            response = requests.get(
+                f"{SUPABASE_URL}/auth/v1/user",
+                headers={
+                    "apikey": SUPABASE_PUBLISHABLE_KEY,
+                    "Authorization": f"Bearer {token}",
+                },
+                timeout=10,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return {"id": data["id"], "email": data.get("email", "")}
+        except requests.RequestException as exc:
+            print(f"Supabase auth exception: {exc}")
+        return None
     with get_db() as connection:
         row = connection.execute(
             "SELECT users.* FROM auth_tokens JOIN users ON users.id = auth_tokens.user_id "
@@ -114,6 +130,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 DEFAULT_ELEVEN_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
 
 def detect_crisis(text):
@@ -280,7 +298,7 @@ def login():
 @app.route('/api/auth/me', methods=['GET'])
 def me():
     user = require_user()
-    if not isinstance(user, sqlite3.Row):
+    if not isinstance(user, (sqlite3.Row, dict)):
         return user
     return jsonify({"user": public_user(user)})
 
@@ -440,7 +458,7 @@ def add_message():
 @app.route('/api/sessions', methods=['POST'])
 def create_session():
     user = require_user()
-    if not isinstance(user, sqlite3.Row):
+    if not isinstance(user, (sqlite3.Row, dict)):
         return user
     session_id = str(uuid.uuid4())
     now = datetime.now().isoformat()
@@ -454,7 +472,7 @@ def create_session():
 @app.route('/api/sessions', methods=['GET'])
 def get_sessions():
     user = require_user()
-    if not isinstance(user, sqlite3.Row):
+    if not isinstance(user, (sqlite3.Row, dict)):
         return user
     with get_db() as connection:
         rows = connection.execute(
@@ -469,7 +487,7 @@ def get_sessions():
 @app.route('/api/sessions/<session_id>/messages', methods=['GET'])
 def get_session_messages(session_id):
     user = require_user()
-    if not isinstance(user, sqlite3.Row):
+    if not isinstance(user, (sqlite3.Row, dict)):
         return user
     with get_db() as connection:
         session = connection.execute("SELECT id FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"])).fetchone()
@@ -484,7 +502,7 @@ def get_session_messages(session_id):
 @app.route('/api/sessions/<session_id>/messages', methods=['POST'])
 def add_session_message(session_id):
     user = require_user()
-    if not isinstance(user, sqlite3.Row):
+    if not isinstance(user, (sqlite3.Row, dict)):
         return user
     data = request.json or {}
     if not data or 'text' not in data:
@@ -523,7 +541,7 @@ def add_session_message(session_id):
 @app.route('/api/sessions/<session_id>', methods=['DELETE'])
 def delete_session(session_id):
     user = require_user()
-    if not isinstance(user, sqlite3.Row):
+    if not isinstance(user, (sqlite3.Row, dict)):
         return user
     with get_db() as connection:
         result = connection.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"]))

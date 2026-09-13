@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 server/*.db
+server/__pycache__/
 
 # Editor directories and files
 .vscode/*
@@ -24,3 +25,4 @@ server/*.db
 *.sln
 *.sw?
 .env
+server/.env

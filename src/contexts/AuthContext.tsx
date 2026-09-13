@@ -6,6 +6,7 @@ import {
 } from '../utils/authStorage';
 import { isValidEmail, validatePassword } from '../utils/validation';
 import * as authService from '../services/authService';
+import { supabase } from '../services/supabaseClient';
 import { AuthContext } from './authContextDefinition';
 
 export interface User {
@@ -25,12 +26,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const token = loadToken();
     if (!token) {
       setLoading(false);
-      return;
+    } else {
+      authService.restoreSession(token)
+        .then(({ user: restoredUser }) => setUser(restoredUser))
+        .catch(() => clearSession())
+        .finally(() => setLoading(false));
     }
-    authService.restoreSession(token)
-      .then(({ user: restoredUser }) => setUser(restoredUser))
-      .catch(() => clearSession())
-      .finally(() => setLoading(false));
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({ id: session.user.id, email: session.user.email ?? '' });
+        persistToken(session.access_token, true);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    return () => subscription.subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string, rememberMe = false) => {
