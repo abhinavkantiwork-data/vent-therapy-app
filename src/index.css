@@ -270,7 +270,10 @@ body {
 .footer-email:hover { text-decoration: underline; }
 
 .auth-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(280px, .8fr) minmax(420px, 1.2fr); color: #183b3a; background: #f7f3ea; font-family: 'DM Sans', sans-serif; }
-.auth-aside { display: flex; flex-direction: column; justify-content: space-between; min-height: 100vh; padding: 38px clamp(30px, 6vw, 92px); color: #f7f3ea; background: #183b3a; }
+.auth-aside { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; min-height: 100vh; padding: 38px clamp(30px, 6vw, 92px); color: #f7f3ea; background: #183b3a; }
+.auth-aside::before, .auth-aside::after { content: ''; position: absolute; z-index: -1; border: 1px solid rgba(223,128,106,.35); border-radius: 50%; pointer-events: none; animation: asideFloat 10s ease-in-out infinite; }
+.auth-aside::before { width: 430px; height: 430px; right: -240px; top: 18%; }
+.auth-aside::after { width: 270px; height: 270px; left: -180px; bottom: 8%; border-color: rgba(169,192,187,.22); animation-delay: -4s; }
 .auth-aside .brand-mark { color: #f7f3ea; }
 .auth-aside-copy { max-width: 365px; padding-block: 60px; }
 .auth-aside h1 { color: #f7f3ea; font-size: clamp(45px, 5vw, 70px); }
@@ -280,6 +283,7 @@ body {
 .auth-panel { padding: 38px clamp(30px, 8vw, 130px); }
 .back-link { display: inline-flex; align-items: center; gap: 8px; color: #6b8581; font-size: 12px; font-weight: 600; text-decoration: none; }
 .auth-form-wrap { width: min(100%, 410px); margin: 110px auto 0; }
+.auth-form-wrap { animation: pageRise .7s cubic-bezier(.2,.8,.2,1) both; }
 .auth-form-wrap h2 { margin: 0; color: #183b3a; font-family: 'DM Serif Display', Georgia, serif; font-size: 47px; font-weight: 400; line-height: 1; }
 .auth-subtitle { margin: 13px 0 32px; color: #78918d; font-size: 14px; }
 .auth-form { display: grid; gap: 17px; }
@@ -303,6 +307,22 @@ body {
 .auth-switch { margin-top: 24px; color: #78918d; text-align: center; font-size: 12px; }
 .auth-switch button { padding: 0; color: #1e6a63; background: transparent; border: 0; cursor: pointer; font: 700 12px 'DM Sans', sans-serif; }
 
+.start-shell { color: #183b3a; background: #f7f3ea; font-family: 'DM Sans', sans-serif; }
+.start-shell > div:not(.fixed) { background: rgba(247,243,234,.72); }
+.start-shell header { background: rgba(255,253,248,.82); border-color: rgba(24,59,58,.12); border-radius: 0; }
+.start-card { position: relative; isolation: isolate; overflow: hidden; background: rgba(255,253,248,.82); border: 1px solid rgba(24,59,58,.12); border-radius: 10px; box-shadow: 0 24px 70px rgba(24,59,58,.12); }
+.start-card::before { content: ''; position: absolute; z-index: -1; width: 260px; height: 260px; top: -150px; right: -90px; border-radius: 50%; background: rgba(223,128,106,.15); filter: blur(3px); }
+.start-orbit { position: absolute; inset: 23px; z-index: -1; pointer-events: none; }
+.start-orbit span { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #df806a; animation: signalDrift 4.5s ease-in-out infinite; }
+.start-orbit span:nth-child(1) { top: 12%; left: 14%; }
+.start-orbit span:nth-child(2) { top: 28%; right: 10%; background: #1e6a63; animation-delay: 1.2s; }
+.start-orbit span:nth-child(3) { bottom: 18%; left: 19%; background: #d7a04b; animation-delay: 2.1s; }
+.start-bot { animation: botBreathe 4s ease-in-out infinite; }
+.start-kicker { margin: 0 0 8px; color: #c65f4d; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.start-title { margin: 0 0 21px; color: #183b3a; font-family: 'DM Serif Display', Georgia, serif; font-size: 32px; font-weight: 400; }
+.start-card .btn-primary, .start-card .btn-lavender { transition: transform .2s ease, box-shadow .2s ease; }
+.start-card .btn-primary:hover, .start-card .btn-lavender:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(24,59,58,.13); }
+
 .chat-shell { color: #183b3a; background: #f7f3ea; }
 .chat-shell > div:not(.fixed) { background: rgba(247,243,234,.78); }
 .chat-shell .glass-effect { background: rgba(255,253,248,.84); border-color: rgba(24,59,58,.12); border-radius: 0; box-shadow: 0 5px 20px rgba(24,59,58,.04); }
@@ -315,9 +335,11 @@ body {
 @keyframes signalDrift { 0%, 100% { transform: translate(0, 0) scale(1); opacity: .8; } 50% { transform: translate(8px, -12px) scale(1.25); opacity: 1; } }
 @keyframes cardFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
 @keyframes softSpin { from { rotate: 0deg; } to { rotate: 360deg; } }
+@keyframes asideFloat { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(18px, -14px) rotate(8deg); } }
+@keyframes botBreathe { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-copy-block, .hero-note, .proof-grid article, .feature-list > div, .note-center, .signal-dot, .floating-card { animation: none; }
+  .hero-copy-block, .hero-note, .proof-grid article, .feature-list > div, .note-center, .signal-dot, .floating-card, .auth-aside::before, .auth-aside::after, .start-orbit span, .start-bot { animation: none; }
   .hero-note { transform: none; }
 }
 

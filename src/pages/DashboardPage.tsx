@@ -84,7 +84,7 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="holographic-bg min-h-screen flex">
+    <div className="start-shell min-h-screen flex">
       <ChatSidebar
         variant="docked"
         currentSessionId={null}
@@ -112,13 +112,17 @@ const DashboardPage: React.FC = () => {
         </header>
 
         <main className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-lg w-full glass-effect p-8 text-center animate-fadeIn">
-            <div className="relative mx-auto w-28 h-28 mb-6">
+          <div className="start-card max-w-lg w-full glass-effect p-8 text-center animate-fadeIn">
+            <div className="start-orbit" aria-hidden="true"><span /><span /><span /></div>
+            <div className="relative mx-auto w-28 h-28 mb-6 start-bot">
               <div className="absolute inset-0 rounded-full bg-peach/40 animate-pulse" />
               <div className="absolute inset-2 rounded-full bg-white/80 flex items-center justify-center shadow-lg ai-orb">
                 <Bot className="w-14 h-14 text-muted-navy" />
               </div>
             </div>
+
+            <p className="start-kicker">Your space is ready</p>
+            <h2 className="start-title">How would you like to feel heard?</h2>
 
             <label className="block text-left text-sm font-medium text-charcoal mb-1">Name your AI companion</label>
             <input
