@@ -38,7 +38,8 @@ export const createSession = async (userEmail: string): Promise<Session> => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to create session');
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to create session (${response.status})`);
     }
 
     return await response.json();

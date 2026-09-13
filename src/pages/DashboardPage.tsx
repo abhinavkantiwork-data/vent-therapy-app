@@ -18,6 +18,7 @@ const DashboardPage: React.FC = () => {
   const [voices, setVoices] = useState<ElevenVoice[]>([]);
   const [starting, setStarting] = useState<'text' | 'voice' | null>(null);
   const [voiceError, setVoiceError] = useState('');
+  const [startError, setStartError] = useState('');
 
   useEffect(() => {
     fetchVoices()
@@ -32,12 +33,14 @@ const DashboardPage: React.FC = () => {
   const startConversation = async (mode: 'text' | 'voice') => {
     if (!user) return;
     setStarting(mode);
+    setStartError('');
     try {
       const session = await createSession(user.email);
       setSessionMode(session.id, mode);
       navigate(`/chat/${session.id}`, { state: { mode } });
     } catch (e) {
       console.error(e);
+      setStartError(e instanceof Error ? e.message : 'Could not start the conversation.');
     } finally {
       setStarting(null);
     }
@@ -106,6 +109,7 @@ const DashboardPage: React.FC = () => {
               )}
             </select>
             {voiceError && <p className="text-xs text-amber-800 mb-4 text-left">{voiceError}</p>}
+            {startError && <p className="text-xs text-red-700 bg-red-100 border border-red-300 rounded p-3 mb-4 text-left">{startError}</p>}
 
             <p className="text-charcoal opacity-80 mb-6">
               Pick a conversation style when you&apos;re ready. History stays on the left.
