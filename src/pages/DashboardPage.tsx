@@ -4,7 +4,7 @@ import { Bot, LogOut, MessageSquare, Mic } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import ChatSidebar from '../components/ChatSidebar';
 import { createSession } from '../services/messageService';
-import { fetchVoices, type ElevenVoice } from '../services/voiceService';
+import { fetchVoices, playTextToSpeech, type ElevenVoice } from '../services/voiceService';
 import {
   loadAssistantPrefs,
   saveAssistantPrefs,
@@ -18,6 +18,7 @@ const DashboardPage: React.FC = () => {
   const [voices, setVoices] = useState<ElevenVoice[]>([]);
   const [starting, setStarting] = useState<'text' | 'voice' | null>(null);
   const [voiceError, setVoiceError] = useState('');
+  const [previewingVoice, setPreviewingVoice] = useState(false);
   const [startError, setStartError] = useState('');
 
   useEffect(() => {
@@ -46,6 +47,19 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const previewVoice = async (voiceId: string) => {
+    setPrefs((current) => ({ ...current, voiceId }));
+    setPreviewingVoice(true);
+    setVoiceError('');
+    try {
+      await playTextToSpeech('Hello, I am here with you. How can I help you today?', voiceId);
+    } catch {
+      setVoiceError('Voice preview is unavailable right now. Check the ElevenLabs setup on the server.');
+    } finally {
+      setPreviewingVoice(false);
+    }
+  };
+
   return (
     <div className="holographic-bg min-h-screen flex">
       <ChatSidebar
@@ -60,7 +74,7 @@ const DashboardPage: React.FC = () => {
       <div className="flex-1 flex flex-col min-h-screen md:ml-80">
         <header className="glass-effect p-4 flex justify-between items-center">
           <h1 className="text-charcoal text-xl font-semibold">
-            VENT<span className="text-peach">0.01</span>
+            VENT<span className="text-peach">0.2</span>
           </h1>
           <div className="flex items-center gap-3">
             {user && <span className="text-sm text-charcoal opacity-70 hidden sm:inline">{user.email}</span>}
@@ -95,7 +109,7 @@ const DashboardPage: React.FC = () => {
             <select
               className="form-select w-full mb-2 text-charcoal"
               value={prefs.voiceId}
-              onChange={(e) => setPrefs((p) => ({ ...p, voiceId: e.target.value }))}
+              onChange={(e) => void previewVoice(e.target.value)}
             >
               {voices.length === 0 ? (
                 <option value={prefs.voiceId}>Default voice</option>
@@ -108,6 +122,7 @@ const DashboardPage: React.FC = () => {
                 ))
               )}
             </select>
+            {previewingVoice && <p className="text-xs text-muted-navy mb-2 text-left animate-pulse">Previewing this voice...</p>}
             {voiceError && <p className="text-xs text-amber-800 mb-4 text-left">{voiceError}</p>}
             {startError && <p className="text-xs text-red-700 bg-red-100 border border-red-300 rounded p-3 mb-4 text-left">{startError}</p>}
 

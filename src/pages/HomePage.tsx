@@ -15,7 +15,7 @@ const HomePage: React.FC = () => {
   return (
     <main className="home-shell">
       <nav className="home-nav page-width">
-        <Link to="/" className="brand-mark" aria-label="VENT home"><span className="brand-mark-icon"><Sparkles size={16} /></span><span>VENT</span></Link>
+        <Link to="/" className="brand-mark" aria-label="VENT home"><span className="brand-mark-icon"><Sparkles size={16} /></span><span>VENT 0.2</span></Link>
         <div className="home-nav-links"><a href="#how-it-works">How it works</a><a href="#questions">Questions</a><Link to={user ? '/dashboard' : '/login'} className="nav-action">{user ? 'Open your space' : 'Sign in'} <ArrowRight size={15} /></Link></div>
       </nav>
 
@@ -30,7 +30,7 @@ const HomePage: React.FC = () => {
 
       <section className="home-faq page-width" id="questions"><div className="faq-heading"><p className="section-kicker">Good to know</p><h2>Questions, answered.</h2></div><div className="faq-list">{faqs.map(([question, answer], index) => <div className="faq-item" key={question}><button type="button" onClick={() => setOpenFaq(openFaq === index ? null : index)} aria-expanded={openFaq === index}><span>{question}</span><ChevronDown size={18} className={openFaq === index ? 'faq-chevron-open' : ''} /></button>{openFaq === index && <p>{answer}</p>}</div>)}</div></section>
 
-      <footer className="home-footer page-width"><div><Link to="/" className="brand-mark"><span className="brand-mark-icon"><Sparkles size={16} /></span><span>VENT</span></Link><p>A little more room to breathe.</p></div><div className="footer-note"><Check size={15} /> Supportive, not a substitute for professional care.</div></footer>
+      <footer className="home-footer page-width"><div><Link to="/" className="brand-mark"><span className="brand-mark-icon"><Sparkles size={16} /></span><span>VENT 0.2</span></Link><p>A little more room to breathe.</p><a className="footer-email" href="mailto:abhinav.kanti.work@gmail.com">abhinav.kanti.work@gmail.com</a></div><div className="footer-note"><Check size={15} /> Supportive, not a substitute for professional care.</div></footer>
     </main>
   );
 };

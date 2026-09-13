@@ -46,8 +46,8 @@ const ChatPage: React.FC = () => {
     if (!user) return;
     try {
       const sessionMessages = await fetchSessionMessages(id);
-      setMessages(sessionMessages);
-      setIsSessionActive(sessionMessages.length > 0);
+      setMessages((current) => sessionMessages.length > 0 ? sessionMessages : current);
+      setIsSessionActive(true);
       if (sessionMessages.length > 0 && !getSessionMode(id)) {
         setSessionModeState('text');
       }
@@ -110,6 +110,15 @@ const ChatPage: React.FC = () => {
       lastActivity: new Date().toISOString(),
       title: 'Session',
     });
+    setIsSessionActive(true);
+    setMessages((existing) => existing.length > 0 ? existing : [{
+      id: `welcome-${sessionId}`,
+      text: `Hello, I'm ${assistantPrefs.name}. How are you feeling today?`,
+      sender: 'ai',
+      timestamp: new Date(),
+      userEmail: user.email,
+      sessionId,
+    }]);
     loadSessionMessages(sessionId);
   }, [user, sessionId, location.state, navigate, loadSessionMessages]);
 
@@ -143,21 +152,6 @@ const ChatPage: React.FC = () => {
 
   const createNewSession = async () => {
     navigate('/dashboard');
-  };
-
-  const startSession = () => {
-    if (!currentSession || !user) return;
-    setIsSessionActive(true);
-    setMessages([
-      {
-        id: Date.now().toString(),
-        text: `Hello, I'm ${assistantPrefs.name}. How are you feeling today?`,
-        sender: 'ai',
-        timestamp: new Date(),
-        userEmail: user.email,
-        sessionId: currentSession.id,
-      },
-    ]);
   };
 
   const endSession = () => {
@@ -293,7 +287,7 @@ const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="holographic-bg min-h-screen flex flex-col bg-soft-beige">
+    <div className="chat-shell min-h-screen flex flex-col">
       <ChatSidebar
         variant="docked"
         currentSessionId={currentSession?.id || null}
@@ -356,15 +350,7 @@ const ChatPage: React.FC = () => {
                   <XCircle className="w-4 h-4 mr-1 text-charcoal" />
                   <span className="hidden sm:inline">End session</span>
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startSession}
-                  className="btn-primary flex items-center text-sm px-2 py-1 md:px-3"
-                >
-                  <span>Start session</span>
-                </button>
-              )}
+              ) : null}
               <button
                 type="button"
                 onClick={() => logout().then(() => navigate('/login'))}
@@ -381,12 +367,7 @@ const ChatPage: React.FC = () => {
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-charcoal opacity-80 p-8">
                   <h2 className="text-xl font-medium mb-2">Your safe space</h2>
-                  <p className="text-center mb-4">Start a session to begin.</p>
-                  {!isSessionActive && (
-                    <button type="button" onClick={startSession} className="btn btn-primary">
-                      Start session
-                    </button>
-                  )}
+                  <p className="text-center mb-4">Your space is ready whenever you are.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
