@@ -92,8 +92,14 @@ def current_user():
             )
             if response.status_code == 200:
                 data = response.json()
-                user = {"id": data["id"], "email": data.get("email", "")}
+                email = data.get("email", "").strip().lower()
                 with get_db() as connection:
+                    existing_user = connection.execute(
+                        "SELECT id, email FROM users WHERE email = ?", (email,)
+                    ).fetchone()
+                    if existing_user is not None:
+                        return {"id": existing_user["id"], "email": existing_user["email"]}
+                    user = {"id": data["id"], "email": email}
                     connection.execute(
                         "INSERT OR IGNORE INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
                         (user["id"], user["email"], "supabase-managed", datetime.now().isoformat()),
