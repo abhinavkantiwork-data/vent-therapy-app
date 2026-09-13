@@ -174,7 +174,7 @@ def call_groq_chat_completion(message_history):
         "model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
         "messages": message_history,
         "temperature": 0.7,
-        "max_tokens": 120
+        "max_tokens": 500
     }
     try:
         response = requests.post(url, headers=headers, json=data, timeout=10)
@@ -209,7 +209,7 @@ def call_gemini_chat_completion(message_history):
     payload = {
         "system_instruction": {"parts": [{"text": system_message}]},
         "contents": contents,
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 160},
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 600},
     }
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -252,14 +252,18 @@ def get_ai_response(message_history, user_email):
     user_message = message_history[-1]['text'] if message_history else ''
     if detect_crisis(user_message):
         return THERAPEUTIC_RESPONSES['crisis'][0]
-    groq_history = [
-        {"role": "system", "content": (
-            "You are an engaging, empathetic AI therapist. Respond to users in a warm, conversational, and supportive manner. "
-            "Ask thoughtful follow-up questions to keep the conversation going and help users reflect on their feelings. "
-            "Offer therapeutic advice, encouragement, and validation. Avoid generic responses—make each reply feel personal and attentive. "
-            "Keep each response concise: 1 to 3 sentences, with one clear follow-up question when helpful."
-        )}
-    ]
+    groq_history = [{"role": "system", "content": (
+        "You are VENT, an empathetic emotional-support assistant. Be warm, specific, practical, and honest. "
+        "Use the conversation history so your reply follows the user's context; do not repeat generic reassurance. "
+        "You are not a replacement for a licensed therapist. Never diagnose, and follow the crisis response when danger is mentioned.\n\n"
+        "Response policy:\n"
+        "- Match the user's requested depth. A simple check-in can be 2 to 4 sentences.\n"
+        "- For planning, sorting thoughts, comparing options, routines, goals, or multi-part questions, give a detailed answer with a clear heading and numbered steps or bullets.\n"
+        "- When a table would make information easier to compare or organize, use a readable Markdown table with useful columns. Do not force a table into an emotional reflection that does not need one.\n"
+        "- For an overwhelmed user, reduce cognitive load: offer 3 to 5 concrete choices or a small next step rather than a long lecture.\n"
+        "- End with at most one thoughtful question when a question would help. Do not ask a question just to fill space.\n\n"
+        f"Apply this response mode to the latest message: {response_style_instruction(user_message)}"
+    )}]
     for msg in message_history:
         role = 'user' if msg['sender'] == 'user' else 'assistant'
         groq_history.append({"role": role, "content": msg['text']})
@@ -270,6 +274,21 @@ def get_ai_response(message_history, user_email):
     if groq_response:
         return groq_response
     return local_support_response(user_message)
+
+
+def response_style_instruction(user_message):
+    lowered = user_message.lower()
+    structure_terms = [
+        "table", "organize", "organise", "plan", "planner", "schedule", "routine",
+        "compare", "options", "pros and cons", "steps", "break this down", "prioritize",
+        "prioritise", "goals", "track", "list",
+    ]
+    detail_terms = ["how do i", "help me decide", "why", "explain", "strategy", "prepare"]
+    if any(term in lowered for term in structure_terms):
+        return "Give a structured, actionable response. Use a Markdown table if it helps organize the user's thoughts, followed by a small next step."
+    if any(term in lowered for term in detail_terms) or len(user_message.split()) > 45:
+        return "Give a moderately detailed response with clear sections or bullets, but avoid unnecessary filler."
+    return "Keep this response concise and conversational, with specific validation and one practical next step when appropriate."
 
 
 def valid_password(password):
