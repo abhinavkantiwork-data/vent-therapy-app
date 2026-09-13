@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Star } from 'lucide-react';
+import { saveMoodLog } from '../services/messageService';
 
 const moodOptions = [
   { label: 'Sad', emoji: '😔', value: 'sad' as const },
@@ -31,8 +32,11 @@ const MoodResultPage: React.FC = () => {
     return null;
   }
 
-  const handleFinish = () => {
+  const sessionId = (location.state || {}).sessionId as string | undefined;
+
+  const handleFinish = async () => {
     if (!selectedMood || experienceRating === 0) return;
+    if (sessionId) await saveMoodLog(sessionId, selectedMood, experienceRating);
     setSubmitted(true);
     setTimeout(() => navigate('/dashboard', { replace: true }), 600);
   };

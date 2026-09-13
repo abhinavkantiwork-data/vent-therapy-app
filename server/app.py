@@ -835,6 +835,33 @@ def session_summary(session_id):
     return jsonify({"summary": rows[0]["summary"] if rows else ""})
 
 
+@app.route('/api/mood-log', methods=['GET', 'POST'])
+def mood_log():
+    user = require_user()
+    if not isinstance(user, dict):
+        return user
+    if request.method == 'POST':
+        data = request.json or {}
+        mood = data.get("mood")
+        rating = data.get("rating")
+        session_id = data.get("sessionId")
+        if mood not in {"sad", "negative", "neutral", "positive", "happy"} or not session_id or not isinstance(rating, int) or not 1 <= rating <= 5:
+            return jsonify({"error": "A valid mood, rating, and session are required."}), 400
+        rows, response = supabase_db_request(
+            "POST", "mood_logs", user["token"],
+            payload={"session_id": session_id, "user_id": user["id"], "mood": mood, "rating": rating},
+        )
+        if rows is None:
+            return jsonify({"error": "Could not save mood."}), 500
+    rows, response = supabase_db_request(
+        "GET", "mood_logs", user["token"],
+        params={"user_id": f"eq.{user['id']}", "select": "id,session_id,mood,rating,created_at", "order": "created_at.asc"},
+    )
+    if rows is None:
+        return jsonify({"error": "Could not load mood history."}), 500
+    return jsonify(rows)
+
+
 @app.route('/api/account/export', methods=['GET'])
 def export_account():
     user = require_user()

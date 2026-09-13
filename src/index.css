@@ -322,6 +322,20 @@ body {
 .start-title { margin: 0 0 21px; color: #183b3a; font-family: 'DM Serif Display', Georgia, serif; font-size: 32px; font-weight: 400; }
 .start-card .btn-primary, .start-card .btn-lavender { transition: transform .2s ease, box-shadow .2s ease; }
 .start-card .btn-primary:hover, .start-card .btn-lavender:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(24,59,58,.13); }
+.start-layout { width: min(100%, 930px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, .72fr); align-items: center; gap: 24px; }
+.mood-card { padding: 25px 22px; color: #183b3a; background: rgba(255,253,248,.76); border: 1px solid rgba(24,59,58,.12); border-radius: 10px; box-shadow: 0 18px 45px rgba(24,59,58,.08); animation: pageRise .8s .12s both; }
+.mood-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mood-card-heading h2 { margin: -8px 0 0; font: 400 29px/1 'DM Serif Display', Georgia, serif; }
+.mood-card-heading > span { padding: 5px 8px; color: #55706d; background: rgba(30,106,99,.08); border-radius: 999px; font-size: 10px; font-weight: 700; }
+.mood-graph { width: 100%; height: auto; margin-top: 23px; overflow: visible; }
+.mood-grid-line { fill: none; stroke: rgba(24,59,58,.1); stroke-width: 1; }
+.mood-graph-line { fill: none; stroke: #1e6a63; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 4px 4px rgba(30,106,99,.18)); }
+.mood-graph-dot { fill: #df806a; stroke: #fffdf8; stroke-width: 2; }
+.mood-legend { display: flex; justify-content: space-between; color: #78918d; font-size: 10px; }
+.mood-card-note { margin: 18px 0 0; color: #78918d; font-size: 11px; line-height: 1.55; }
+.mood-empty { min-height: 170px; display: grid; place-items: center; align-content: center; color: #78918d; text-align: center; }
+.mood-empty span { color: #df806a; font-size: 43px; line-height: 1; }
+.mood-empty p { max-width: 190px; margin: 13px 0 0; font-size: 12px; line-height: 1.5; }
 
 .chat-shell { color: #183b3a; background: #f7f3ea; }
 .chat-shell > div:not(.fixed) { background: rgba(247,243,234,.78); }
@@ -363,6 +377,7 @@ body {
   .auth-aside h1 { font-size: 51px; }
   .auth-panel { padding: 25px; }
   .auth-form-wrap { margin-top: 65px; }
+  .start-layout { grid-template-columns: 1fr; max-width: 560px; }
 }
 
 .typing-indicator {

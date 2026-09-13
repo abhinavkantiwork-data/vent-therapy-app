@@ -151,6 +151,28 @@ export async function deleteAccount() {
   if (!response.ok) throw new Error('Could not delete account');
 }
 
+export interface MoodLog {
+  id: string;
+  session_id: string;
+  mood: 'sad' | 'negative' | 'neutral' | 'positive' | 'happy';
+  rating: number;
+  created_at: string;
+}
+
+export async function saveMoodLog(sessionId: string, mood: MoodLog['mood'], rating: number) {
+  const response = await fetch(`${API_BASE}/api/mood-log`, {
+    method: 'POST', headers: authHeaders(true),
+    body: JSON.stringify({ sessionId, mood, rating }),
+  });
+  if (!response.ok) throw new Error('Could not save mood');
+}
+
+export async function fetchMoodLogs(): Promise<MoodLog[]> {
+  const response = await fetch(`${API_BASE}/api/mood-log`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Could not load mood history');
+  return response.json() as Promise<MoodLog[]>;
+}
+
 export const getSessionMood = async (sessionId: string): Promise<string> => {
   try {
     const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/mood`, {

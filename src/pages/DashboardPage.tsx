@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bot, Download, LogOut, MessageSquare, Mic, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import ChatSidebar from '../components/ChatSidebar';
-import { createSession, deleteAccount, exportAccountData, savePreferences } from '../services/messageService';
+import { createSession, deleteAccount, exportAccountData, fetchMoodLogs, savePreferences, type MoodLog } from '../services/messageService';
 import { fetchVoices, playTextToSpeech, stopTextToSpeech, type ElevenVoice } from '../services/voiceService';
 import {
   loadAssistantPrefs,
@@ -20,6 +20,7 @@ const DashboardPage: React.FC = () => {
   const [voiceError, setVoiceError] = useState('');
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const [startError, setStartError] = useState('');
+  const [moodLogs, setMoodLogs] = useState<MoodLog[]>([]);
 
   useEffect(() => {
     fetchVoices()
@@ -31,6 +32,13 @@ const DashboardPage: React.FC = () => {
     saveAssistantPrefs(prefs);
     if (user) void savePreferences(prefs).catch((error) => console.error('Preference save error:', error));
   }, [prefs, user]);
+
+  useEffect(() => {
+    if (user) void fetchMoodLogs().then(setMoodLogs).catch((error) => console.error('Mood history error:', error));
+  }, [user]);
+
+  const graphLogs = moodLogs.slice(-7);
+  const graphPoints = graphLogs.map((log, index) => `${index * 52 + 18},${118 - log.rating * 20}`).join(' ');
 
   const startConversation = async (mode: 'text' | 'voice') => {
     if (!user) return;
@@ -114,6 +122,7 @@ const DashboardPage: React.FC = () => {
         </header>
 
         <main className="flex-1 flex items-center justify-center p-6">
+          <div className="start-layout">
           <div className="start-card max-w-lg w-full glass-effect p-8 text-center animate-fadeIn">
             <div className="start-orbit" aria-hidden="true"><span /><span /><span /></div>
             <div className="relative mx-auto w-28 h-28 mb-6 start-bot">
@@ -190,6 +199,19 @@ const DashboardPage: React.FC = () => {
               <button type="button" onClick={() => void handleExport()} className="inline-flex items-center gap-1 hover:opacity-100"><Download size={14} /> Export data</button>
               <button type="button" onClick={() => void handleDeleteAccount()} className="inline-flex items-center gap-1 text-red-700 hover:opacity-100"><Trash2 size={14} /> Delete account</button>
             </div>
+          </div>
+          <section className="mood-card" aria-label="Mood log">
+            <div className="mood-card-heading"><div><p className="start-kicker">Your pattern</p><h2>Mood log</h2></div><span>{moodLogs.length} {moodLogs.length === 1 ? 'session' : 'sessions'}</span></div>
+            {graphLogs.length > 0 ? <>
+              <svg className="mood-graph" viewBox="0 0 330 140" role="img" aria-label="Mood trend graph">
+                <path d="M18 18H318M18 58H318M18 98H318M18 118H318" className="mood-grid-line" />
+                <polyline points={graphPoints} className="mood-graph-line" />
+                {graphLogs.map((log, index) => <circle key={log.id} cx={index * 52 + 18} cy={118 - log.rating * 20} r="4" className="mood-graph-dot" />)}
+              </svg>
+              <div className="mood-legend"><span>Low</span><span>Neutral</span><span>High</span></div>
+              <p className="mood-card-note">Your mood is self-reported after each session. Patterns matter more than any single day.</p>
+            </> : <div className="mood-empty"><span>○</span><p>Your mood story will appear here after your first session.</p></div>}
+          </section>
           </div>
         </main>
       </div>
