@@ -212,15 +212,24 @@ body {
 .primary-action { padding: 15px 20px; color: #f7f3ea; background: #183b3a; border-radius: 5px; }
 .text-action { display: inline-flex; align-items: center; gap: 8px; color: #183b3a; font-size: 13px; font-weight: 700; text-decoration: none; }
 .hero-trust { display: flex; align-items: center; gap: 7px; margin-top: 29px; color: #78918d; font-size: 12px; }
-.hero-note { position: relative; min-height: 390px; display: grid; place-items: center; }
+.hero-note { position: relative; min-height: 390px; display: grid; place-items: center; transform: translate(var(--pointer-x, 0), var(--pointer-y, 0)); transition: transform .35s cubic-bezier(.2,.8,.2,1); }
 .hero-note { animation: noteReveal 1s .15s cubic-bezier(.2,.8,.2,1) both; }
 .note-orbit { position: absolute; width: 285px; aspect-ratio: 1; border: 1px solid rgba(30,106,99,.25); border-radius: 50%; transform: rotate(-22deg) scaleY(.62); }
 .note-orbit-one { width: 360px; border-color: rgba(198,95,77,.25); transform: rotate(25deg) scaleY(.62); }
 .note-orbit-two { width: 260px; transform: rotate(80deg) scaleY(.62); }
 .note-center { width: 112px; height: 112px; display: grid; place-items: center; color: #f7f3ea; background: #1e6a63; border-radius: 50%; box-shadow: 0 0 0 14px rgba(30,106,99,.09), 0 20px 50px rgba(24,59,58,.18); animation: coreFloat 4s ease-in-out infinite; }
+.note-center svg { animation: softSpin 12s linear infinite; }
 .note-caption { position: absolute; right: 2%; bottom: 12%; width: 195px; padding: 16px; color: #183b3a; background: #fffdf8; border-left: 3px solid #df806a; box-shadow: 0 15px 35px rgba(24,59,58,.1); }
 .note-caption span { display: block; margin-bottom: 7px; color: #c65f4d; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .note-caption strong { font-family: 'DM Serif Display', Georgia, serif; font-size: 19px; font-weight: 400; line-height: 1.08; }
+.signal-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #df806a; box-shadow: 0 0 0 6px rgba(223,128,106,.13); animation: signalDrift 4s ease-in-out infinite; }
+.signal-dot-one { top: 19%; left: 28%; }
+.signal-dot-two { right: 18%; top: 35%; width: 6px; height: 6px; animation-delay: 1s; background: #1e6a63; }
+.signal-dot-three { bottom: 18%; left: 23%; width: 5px; height: 5px; animation-delay: 2s; background: #d7a04b; }
+.floating-card { position: absolute; display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; color: #55706d; background: rgba(255,253,248,.82); border: 1px solid rgba(24,59,58,.11); box-shadow: 0 12px 28px rgba(24,59,58,.1); font-size: 11px; font-weight: 700; letter-spacing: .04em; animation: cardFloat 5s ease-in-out infinite; }
+.floating-card-top { top: 13%; right: 8%; transform: rotate(5deg); }
+.floating-card-bottom { bottom: 17%; left: 6%; color: #c65f4d; transform: rotate(-6deg); animation-delay: 1.4s; }
+.floating-card-dot { width: 7px; height: 7px; border-radius: 50%; background: #df806a; }
 .home-proof { padding-block: 76px 88px; border-top: 1px solid rgba(24,59,58,.12); }
 .proof-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 35px; }
 .proof-grid article { padding-right: 28px; border-right: 1px solid rgba(24,59,58,.15); }
@@ -303,9 +312,13 @@ body {
 
 @keyframes pageRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes noteReveal { from { opacity: 0; transform: translateY(20px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes signalDrift { 0%, 100% { transform: translate(0, 0) scale(1); opacity: .8; } 50% { transform: translate(8px, -12px) scale(1.25); opacity: 1; } }
+@keyframes cardFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+@keyframes softSpin { from { rotate: 0deg; } to { rotate: 360deg; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-copy-block, .hero-note, .proof-grid article, .feature-list > div, .note-center { animation: none; }
+  .hero-copy-block, .hero-note, .proof-grid article, .feature-list > div, .note-center, .signal-dot, .floating-card { animation: none; }
+  .hero-note { transform: none; }
 }
 
 @media (max-width: 760px) {

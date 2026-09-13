@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/useAuth';
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [pointer, setPointer] = useState({ x: 0, y: 0 });
   const faqs = [
     ['Is VENT a replacement for therapy?', 'No. VENT offers everyday emotional support and reflection, but it is not a replacement for a licensed mental health professional or emergency care.'],
     ['Are my conversations private?', 'Your account and conversations are tied to your authenticated session. Avoid sharing sensitive information you would not want stored online.'],
@@ -19,9 +20,26 @@ const HomePage: React.FC = () => {
         <div className="home-nav-links"><a href="#how-it-works">How it works</a><a href="#questions">Questions</a><Link to={user ? '/dashboard' : '/login'} className="nav-action">{user ? 'Open your space' : 'Sign in'} <ArrowRight size={15} /></Link></div>
       </nav>
 
-      <section className="home-hero page-width">
+      <section
+        className="home-hero page-width"
+        onMouseMove={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          setPointer({
+            x: (event.clientX - bounds.left) / bounds.width - 0.5,
+            y: (event.clientY - bounds.top) / bounds.height - 0.5,
+          });
+        }}
+        onMouseLeave={() => setPointer({ x: 0, y: 0 })}
+      >
         <div className="hero-copy-block"><p className="eyebrow"><span className="eyebrow-dot" /> A calmer place to begin</p><h1>Make room for what you feel.</h1><p className="hero-lede">VENT is a private space to talk things through, notice patterns, and find one steady next step.</p><div className="hero-actions"><Link to={user ? '/dashboard' : '/login'} className="primary-action">{user ? 'Go to your space' : 'Start a conversation'} <ArrowRight size={18} /></Link><a href="#how-it-works" className="text-action">See how it works <ArrowRight size={16} /></a></div><div className="hero-trust"><LockKeyhole size={15} /> Your words stay tied to your account</div></div>
-        <div className="hero-note" aria-label="A quiet space for reflection"><div className="note-orbit note-orbit-one" /><div className="note-orbit note-orbit-two" /><div className="note-center"><Brain size={28} /></div><div className="note-caption"><span>Today’s prompt</span><strong>What would feel a little lighter?</strong></div></div>
+        <div className="hero-note" aria-label="A quiet space for reflection" style={{ '--pointer-x': `${pointer.x * 14}px`, '--pointer-y': `${pointer.y * 14}px` } as React.CSSProperties}>
+          <div className="note-orbit note-orbit-one" /><div className="note-orbit note-orbit-two" />
+          <div className="signal-dot signal-dot-one" /><div className="signal-dot signal-dot-two" /><div className="signal-dot signal-dot-three" />
+          <div className="note-center"><Brain size={28} /></div>
+          <div className="note-caption"><span>Today’s prompt</span><strong>What would feel a little lighter?</strong></div>
+          <div className="floating-card floating-card-top"><span className="floating-card-dot" /> pause</div>
+          <div className="floating-card floating-card-bottom"><HeartHandshake size={14} /> be honest</div>
+        </div>
       </section>
 
       <section className="home-proof page-width" id="how-it-works"><p className="section-kicker">A simple ritual for difficult days</p><div className="proof-grid"><article><span className="proof-number">01</span><h2>Say what’s there</h2><p>Write or speak honestly, without needing the perfect words.</p></article><article><span className="proof-number">02</span><h2>Find a little clarity</h2><p>Receive a thoughtful response that helps you slow down and reflect.</p></article><article><span className="proof-number">03</span><h2>Keep the thread</h2><p>Return to your sessions and notice what changes over time.</p></article></div></section>
