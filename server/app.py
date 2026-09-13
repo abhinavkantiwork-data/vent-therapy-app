@@ -138,7 +138,7 @@ messages = {}
 
 THERAPEUTIC_RESPONSES = {
     'crisis': [
-        "It sounds like you're going through a very difficult time. If you're thinking about harming yourself or others, please reach out to a mental health professional or a crisis helpline immediately. You're not alone, and there are people who care and want to help."
+        "I am really sorry you are carrying this much right now. Are you in immediate danger, or have you taken any steps to hurt yourself or someone else? Please contact your local emergency service or crisis line now, and move near a trusted person if you can. I can stay with you while you focus on getting immediate human support."
     ]
 }
 
@@ -157,7 +157,8 @@ DEFAULT_ELEVEN_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
 def detect_crisis(text):
     lowered = text.lower()
     for word in CRISIS_KEYWORDS:
-        if word in lowered:
+        pattern = rf"(?<!\w){re.escape(word)}(?!\w)"
+        if re.search(pattern, lowered):
             return True
     return False
 
@@ -252,19 +253,29 @@ def get_ai_response(message_history, user_email):
     user_message = message_history[-1]['text'] if message_history else ''
     if detect_crisis(user_message):
         return THERAPEUTIC_RESPONSES['crisis'][0]
+    recent_history = message_history[-14:]
     groq_history = [{"role": "system", "content": (
         "You are VENT, an empathetic emotional-support assistant. Be warm, specific, practical, and honest. "
-        "Use the conversation history so your reply follows the user's context; do not repeat generic reassurance. "
+        "Use the recent conversation context so your reply follows the user's context; do not repeat generic reassurance. "
         "You are not a replacement for a licensed therapist. Never diagnose, and follow the crisis response when danger is mentioned.\n\n"
+        "Therapeutic method selection:\n"
+        "- Use reflective listening first: name the emotion or tension tentatively, without claiming certainty.\n"
+        "- Use CBT-style thought-feeling-behavior separation when the user is stuck in a painful interpretation.\n"
+        "- Use motivational interviewing when the user feels ambivalent: explore both sides without pressure.\n"
+        "- Use grounding or a brief breathing exercise when the user sounds panicked or overwhelmed.\n"
+        "- Use practical problem-solving when the user asks what to do: define the problem, offer a few options, and suggest one small next step.\n"
+        "Do not name a technique unless the user asks; make it feel like natural conversation.\n\n"
         "Response policy:\n"
         "- Match the user's requested depth. A simple check-in can be 2 to 4 sentences.\n"
         "- For planning, sorting thoughts, comparing options, routines, goals, or multi-part questions, give a detailed answer with a clear heading and numbered steps or bullets.\n"
         "- When a table would make information easier to compare or organize, use a readable Markdown table with useful columns. Do not force a table into an emotional reflection that does not need one.\n"
         "- For an overwhelmed user, reduce cognitive load: offer 3 to 5 concrete choices or a small next step rather than a long lecture.\n"
         "- End with at most one thoughtful question when a question would help. Do not ask a question just to fill space.\n\n"
-        f"Apply this response mode to the latest message: {response_style_instruction(user_message)}"
+        f"Apply this response mode to the latest message: {response_style_instruction(user_message)}\n"
+        f"Use this therapeutic approach: {therapeutic_approach(user_message)}\n"
+        f"Conversation memory: {conversation_memory(recent_history)}"
     )}]
-    for msg in message_history:
+    for msg in recent_history:
         role = 'user' if msg['sender'] == 'user' else 'assistant'
         groq_history.append({"role": role, "content": msg['text']})
     gemini_response = call_gemini_chat_completion(groq_history)
@@ -289,6 +300,27 @@ def response_style_instruction(user_message):
     if any(term in lowered for term in detail_terms) or len(user_message.split()) > 45:
         return "Give a moderately detailed response with clear sections or bullets, but avoid unnecessary filler."
     return "Keep this response concise and conversational, with specific validation and one practical next step when appropriate."
+
+
+def therapeutic_approach(user_message):
+    lowered = user_message.lower()
+    if any(term in lowered for term in ["panic", "panicking", "can't breathe", "overwhelmed", "overwhelm"]):
+        return "Start with grounding and emotional regulation before problem-solving."
+    if any(term in lowered for term in ["should i", "can't decide", "cannot decide", "part of me", "torn"]):
+        return "Use motivational interviewing: reflect the ambivalence and explore both options without deciding for the user."
+    if any(term in lowered for term in ["thought", "believe", "failure", "worthless", "always", "never"]):
+        return "Use gentle CBT-style exploration of the thought, feeling, and behavior without disputing the user's experience."
+    if any(term in lowered for term in ["what should i do", "how can i", "plan", "organize", "organise", "schedule"]):
+        return "Use practical problem-solving with a small, achievable next action."
+    return "Use reflective listening, tentative validation, and one helpful next step."
+
+
+def conversation_memory(message_history):
+    if len(message_history) <= 2:
+        return "This is the beginning of the conversation; learn the user's context from the latest message."
+    user_messages = [message["text"].strip() for message in message_history if message.get("sender") == "user"]
+    recent_user_messages = user_messages[-4:]
+    return "Earlier user themes, in their own words: " + " | ".join(recent_user_messages)
 
 
 def valid_password(password):
