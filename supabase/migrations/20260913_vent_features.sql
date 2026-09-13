@@ -38,6 +38,11 @@ alter table public.session_summaries enable row level security;
 alter table public.message_feedback enable row level security;
 alter table public.mood_logs enable row level security;
 
+drop policy if exists "Users manage their preferences" on public.user_preferences;
+drop policy if exists "Users manage their summaries" on public.session_summaries;
+drop policy if exists "Users manage their feedback" on public.message_feedback;
+drop policy if exists "Users manage their mood logs" on public.mood_logs;
+
 create policy "Users manage their preferences" on public.user_preferences for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users manage their summaries" on public.session_summaries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users manage their feedback" on public.message_feedback for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
