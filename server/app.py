@@ -92,7 +92,13 @@ def current_user():
             )
             if response.status_code == 200:
                 data = response.json()
-                return {"id": data["id"], "email": data.get("email", "")}
+                user = {"id": data["id"], "email": data.get("email", "")}
+                with get_db() as connection:
+                    connection.execute(
+                        "INSERT OR IGNORE INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
+                        (user["id"], user["email"], "supabase-managed", datetime.now().isoformat()),
+                    )
+                return user
         except requests.RequestException as exc:
             print(f"Supabase auth exception: {exc}")
         return None
