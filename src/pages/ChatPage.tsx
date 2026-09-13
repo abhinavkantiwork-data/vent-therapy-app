@@ -38,6 +38,7 @@ const ChatPage: React.FC = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const shouldContinueListeningRef = useRef(false);
   const lastSpokenAiId = useRef<string | null>(null);
+  const voiceSessionActiveRef = useRef(false);
   const speechPlaybackRef = useRef<Promise<void>>(Promise.resolve());
   const navigate = useNavigate();
   const location = useLocation();
@@ -98,6 +99,7 @@ const ChatPage: React.FC = () => {
     if (mode) {
       setSessionModeState(mode);
       setSessionMode(sessionId, mode);
+      voiceSessionActiveRef.current = mode === 'voice';
     }
 
     setCurrentSession({
@@ -133,14 +135,14 @@ const ChatPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (sessionMode !== 'voice' || messages.length === 0) return;
+    if (sessionMode !== 'voice' || !voiceSessionActiveRef.current || !isSessionActive || messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.sender !== 'ai' || lastMsg.id === lastSpokenAiId.current) return;
     lastSpokenAiId.current = lastMsg.id;
     setIsSpeaking(true);
     speechPlaybackRef.current = playTextToSpeech(lastMsg.text, assistantPrefs.voiceId).catch((err) => {
       console.error(err);
-      setSpeechError('Voice playback is unavailable in this browser. You can continue with text chat.');
+      setSpeechError('ElevenLabs voice playback failed. Text chat is still available.');
     }).finally(() => setIsSpeaking(false));
   }, [messages, sessionMode, assistantPrefs.voiceId, isSessionActive]);
 
@@ -156,6 +158,7 @@ const ChatPage: React.FC = () => {
   const endSession = () => {
     if (!user || !currentSession) return;
     shouldContinueListeningRef.current = false;
+    voiceSessionActiveRef.current = false;
     mediaRecorderRef.current?.stop();
     stopTextToSpeech();
     setIsSpeaking(false);

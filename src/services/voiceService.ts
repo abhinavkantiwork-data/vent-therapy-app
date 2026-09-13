@@ -6,7 +6,7 @@ export interface ElevenVoice {
   labels?: Record<string, string>;
 }
 
-let activeAudio: HTMLAudioElement | null = null;
+const activeAudios = new Set<HTMLAudioElement>();
 let playbackGeneration = 0;
 
 export async function fetchVoices(): Promise<ElevenVoice[]> {
@@ -21,8 +21,8 @@ export async function fetchVoices(): Promise<ElevenVoice[]> {
 
 export async function playTextToSpeech(text: string, voiceId: string): Promise<void> {
   const generation = ++playbackGeneration;
-  activeAudio?.pause();
-  activeAudio = null;
+  activeAudios.forEach((audio) => audio.pause());
+  activeAudios.clear();
   window.speechSynthesis?.cancel();
   let response: Response;
   try {
@@ -32,15 +32,11 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
       body: JSON.stringify({ text, voiceId }),
     });
   } catch {
-    if (generation !== playbackGeneration) return;
-    await speakWithBrowser(text);
-    return;
+    throw new Error('ElevenLabs voice service is unreachable.');
   }
   if (generation !== playbackGeneration) return;
   if (!response.ok) {
-    if (generation !== playbackGeneration) return;
-    await speakWithBrowser(text);
-    return;
+    throw new Error('ElevenLabs voice playback failed.');
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
@@ -49,7 +45,7 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
     return;
   }
   const audio = new Audio(url);
-  activeAudio = audio;
+  activeAudios.add(audio);
   try {
     await audio.play();
     await new Promise<void>((resolve, reject) => {
@@ -58,14 +54,14 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
     });
   } finally {
     URL.revokeObjectURL(url);
-    if (activeAudio === audio) activeAudio = null;
+    activeAudios.delete(audio);
   }
 }
 
 export function stopTextToSpeech() {
   playbackGeneration += 1;
-  activeAudio?.pause();
-  activeAudio = null;
+  activeAudios.forEach((audio) => audio.pause());
+  activeAudios.clear();
   window.speechSynthesis?.cancel();
 }
 
@@ -83,17 +79,3 @@ export async function transcribeAudio(audio: Blob): Promise<string> {
   return data.text || '';
 }
 
-function speakWithBrowser(text: string): Promise<void> {
-  if (!('speechSynthesis' in window)) {
-    throw new Error('No text-to-speech engine is available in this browser.');
-  }
-  return new Promise((resolve, reject) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error('Browser speech playback failed'));
-    window.speechSynthesis.speak(utterance);
-  });
-}
