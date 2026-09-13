@@ -74,14 +74,6 @@ const ChatPage: React.FC = () => {
         sessionId: session.id,
       }, assistantPrefs);
       setMessages((prev) => [...prev, savedUserMessage, aiMessage]);
-      if (sessionMode === 'voice') {
-        lastSpokenAiId.current = aiMessage.id;
-        setIsSpeaking(true);
-        speechPlaybackRef.current = playTextToSpeech(aiMessage.text, assistantPrefs.voiceId).catch((err) => {
-          console.error(err);
-          setSpeechError('Voice playback is unavailable in this browser. You can continue with text chat.');
-        }).finally(() => setIsSpeaking(false));
-      }
     } catch (error) {
       console.error('Error getting AI response:', error);
     } finally {

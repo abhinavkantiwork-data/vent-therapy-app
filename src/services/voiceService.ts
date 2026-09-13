@@ -19,30 +19,34 @@ export async function fetchVoices(): Promise<ElevenVoice[]> {
 }
 
 export async function playTextToSpeech(text: string, voiceId: string): Promise<void> {
+  let response: Response;
   try {
-    const response = await fetch(`${API_BASE}/api/tts`, {
+    response = await fetch(`${API_BASE}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, voiceId }),
     });
-    if (!response.ok) throw new Error('ElevenLabs request failed');
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    try {
-      const audio = new Audio(url);
-      activeAudio = audio;
-      await audio.play();
-      await new Promise<void>((resolve, reject) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => reject(new Error('Audio playback failed'));
-      });
-      return;
-    } finally {
-      URL.revokeObjectURL(url);
-      if (activeAudio === audio) activeAudio = null;
-    }
   } catch {
     await speakWithBrowser(text);
+    return;
+  }
+  if (!response.ok) {
+    await speakWithBrowser(text);
+    return;
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  activeAudio = audio;
+  try {
+    await audio.play();
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => reject(new Error('Audio playback failed'));
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+    if (activeAudio === audio) activeAudio = null;
   }
 }
 
