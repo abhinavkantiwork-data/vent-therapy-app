@@ -6,6 +6,8 @@ export interface ElevenVoice {
   labels?: Record<string, string>;
 }
 
+let activeAudio: HTMLAudioElement | null = null;
+
 export async function fetchVoices(): Promise<ElevenVoice[]> {
   const response = await fetch(`${API_BASE}/api/voices`);
   if (!response.ok) {
@@ -28,6 +30,7 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
     const url = URL.createObjectURL(blob);
     try {
       const audio = new Audio(url);
+      activeAudio = audio;
       await audio.play();
       await new Promise<void>((resolve, reject) => {
         audio.onended = () => resolve();
@@ -36,10 +39,17 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
       return;
     } finally {
       URL.revokeObjectURL(url);
+      if (activeAudio === audio) activeAudio = null;
     }
   } catch {
     await speakWithBrowser(text);
   }
+}
+
+export function stopTextToSpeech() {
+  activeAudio?.pause();
+  activeAudio = null;
+  window.speechSynthesis?.cancel();
 }
 
 export async function transcribeAudio(audio: Blob): Promise<string> {

@@ -1,6 +1,10 @@
 export interface AssistantPrefs {
   name: string;
   voiceId: string;
+  answerLength: 'short' | 'detailed' | 'adaptive';
+  responseMode: 'advice' | 'listening';
+  formatMode: 'structured' | 'conversational' | 'adaptive';
+  tone: 'gentle' | 'direct';
 }
 
 const PREFS_KEY = 'vent_assistant_prefs';
@@ -10,12 +14,12 @@ export function loadAssistantPrefs(): AssistantPrefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (raw) {
-      return { name: 'Vent', voiceId: DEFAULT_VOICE, ...JSON.parse(raw) };
+      return { name: 'Vent', voiceId: DEFAULT_VOICE, answerLength: 'adaptive', responseMode: 'advice', formatMode: 'adaptive', tone: 'gentle', ...JSON.parse(raw) };
     }
   } catch {
     /* ignore */
   }
-  return { name: 'Vent', voiceId: DEFAULT_VOICE };
+  return { name: 'Vent', voiceId: DEFAULT_VOICE, answerLength: 'adaptive', responseMode: 'advice', formatMode: 'adaptive', tone: 'gentle' };
 }
 
 export function saveAssistantPrefs(prefs: AssistantPrefs) {

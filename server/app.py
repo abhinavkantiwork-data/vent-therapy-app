@@ -120,7 +120,7 @@ def supabase_db_request(method, table, token, params=None, payload=None):
             "apikey": SUPABASE_PUBLISHABLE_KEY,
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
-            "Prefer": "return=representation",
+            "Prefer": "return=representation,resolution=merge-duplicates",
         },
         params=params,
         json=payload,
@@ -152,6 +152,7 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 DEFAULT_ELEVEN_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
 
 def detect_crisis(text):
@@ -249,7 +250,7 @@ def analyze_mood_from_messages(message_list):
     return "neutral"
 
 
-def get_ai_response(message_history, user_email):
+def get_ai_response(message_history, user_email, preferences=None, summary=""):
     user_message = message_history[-1]['text'] if message_history else ''
     if detect_crisis(user_message):
         return THERAPEUTIC_RESPONSES['crisis'][0]
@@ -273,7 +274,9 @@ def get_ai_response(message_history, user_email):
         "- End with at most one thoughtful question when a question would help. Do not ask a question just to fill space.\n\n"
         f"Apply this response mode to the latest message: {response_style_instruction(user_message)}\n"
         f"Use this therapeutic approach: {therapeutic_approach(user_message)}\n"
-        f"Conversation memory: {conversation_memory(recent_history)}"
+        f"Conversation memory: {conversation_memory(recent_history)}\n"
+        f"Session summary: {summary or 'No summary has been created yet.'}\n"
+        f"User preferences: {preference_instruction(preferences)}"
     )}]
     for msg in recent_history:
         role = 'user' if msg['sender'] == 'user' else 'assistant'
@@ -321,6 +324,42 @@ def conversation_memory(message_history):
     user_messages = [message["text"].strip() for message in message_history if message.get("sender") == "user"]
     recent_user_messages = user_messages[-4:]
     return "Earlier user themes, in their own words: " + " | ".join(recent_user_messages)
+
+
+def preference_instruction(preferences):
+    preferences = preferences or {}
+    length = preferences.get("answerLength", "adaptive")
+    mode = preferences.get("responseMode", "advice")
+    format_mode = preferences.get("formatMode", "adaptive")
+    tone = preferences.get("tone", "gentle")
+    return (
+        f"Answer length: {length}; mode: {mode}; format: {format_mode}; tone: {tone}. "
+        "Honor these preferences unless safety requires otherwise. "
+        "In listening mode, prioritize reflection and ask before offering advice. "
+        "In structured format, use headings, bullets, or a table when useful."
+    )
+
+
+def build_session_summary(message_history):
+    user_messages = [m["text"].strip() for m in message_history if m.get("sender") == "user"]
+    if not user_messages:
+        return ""
+    return "User has discussed: " + " | ".join(user_messages[-5:])
+
+
+def evaluate_response(response, user_message, requested_length="adaptive"):
+    """Return explainable quality signals for regression tests and future analytics."""
+    words = response.split()
+    lowered = response.lower()
+    signals = {
+        "empathy": any(term in lowered for term in ["sounds", "hear", "makes sense", "understand", "sorry"]),
+        "specificity": len(words) >= 25 or any(mark in response for mark in ["1.", "- ", "| "]),
+        "usefulness": any(term in lowered for term in ["try", "could", "next", "step", "consider"]),
+        "safety": not any(term in lowered for term in ["you are diagnosed", "definitely have"]),
+        "length_match": requested_length == "adaptive" or (requested_length == "short" and len(words) <= 100) or (requested_length == "detailed" and len(words) >= 40),
+    }
+    signals["score"] = round(sum(signals.values()) / 5, 2)
+    return signals
 
 
 def valid_password(password):
@@ -639,13 +678,26 @@ def add_session_message(session_id):
         )
         if previous_rows is None:
             return jsonify({"error": "Could not load message history."}), 500
+        preference_rows, response = supabase_db_request(
+            "GET", "user_preferences", user["token"],
+            params={"user_id": f"eq.{user['id']}", "select": "answer_length,response_mode,format_mode,tone"},
+        )
+        summary_rows, response = supabase_db_request(
+            "GET", "session_summaries", user["token"],
+            params={"session_id": f"eq.{session_id}", "user_id": f"eq.{user['id']}", "select": "summary"},
+        )
+        preferences = None
+        if preference_rows:
+            row = preference_rows[0]
+            preferences = {"answerLength": row["answer_length"], "responseMode": row["response_mode"], "formatMode": row["format_mode"], "tone": row["tone"]}
+        summary = summary_rows[0]["summary"] if summary_rows else ""
         now = datetime.now().isoformat()
         user_message = {
             "id": str(uuid.uuid4()), "text": text, "sender": "user", "timestamp": now,
             "userEmail": user["email"], "sessionId": session_id,
         }
         history = previous_rows + [{"text": text, "sender": "user"}]
-        ai_response_text = get_ai_response(history, user["email"])
+        ai_response_text = get_ai_response(history, user["email"], preferences, summary)
         ai_message = {
             "id": str(uuid.uuid4()), "text": ai_response_text, "sender": "ai",
             "timestamp": datetime.now().isoformat(), "userEmail": user["email"], "sessionId": session_id,
@@ -664,6 +716,11 @@ def add_session_message(session_id):
             "PATCH", "sessions", user["token"],
             params={"id": f"eq.{session_id}", "user_id": f"eq.{user['id']}"},
             payload={"last_activity": ai_message["timestamp"], "title": title},
+        )
+        summary_text = build_session_summary(history + [{"text": ai_response_text, "sender": "ai"}])
+        supabase_db_request(
+            "POST", "session_summaries", user["token"],
+            payload={"session_id": session_id, "user_id": user["id"], "summary": summary_text},
         )
         return jsonify({"userMessage": user_message, "aiMessage": ai_message})
     with get_db() as connection:
@@ -712,6 +769,100 @@ def delete_session(session_id):
         if result.rowcount == 0:
             return jsonify({"error": "Session not found"}), 404
     return jsonify({"message": "Session deleted successfully"})
+
+
+@app.route('/api/preferences', methods=['GET', 'PUT'])
+def preferences():
+    user = require_user()
+    if not isinstance(user, dict):
+        return user
+    if request.method == 'PUT':
+        data = request.json or {}
+        payload = {
+            "user_id": user["id"],
+            "answer_length": data.get("answerLength", "adaptive"),
+            "response_mode": data.get("responseMode", "advice"),
+            "format_mode": data.get("formatMode", "adaptive"),
+            "tone": data.get("tone", "gentle"),
+        }
+        rows, response = supabase_db_request("POST", "user_preferences", user["token"], payload=payload)
+        if rows is None:
+            return jsonify({"error": "Could not save preferences."}), 500
+    rows, response = supabase_db_request(
+        "GET", "user_preferences", user["token"],
+        params={"user_id": f"eq.{user['id']}", "select": "answer_length,response_mode,format_mode,tone"},
+    )
+    if rows is None:
+        return jsonify({"error": "Could not load preferences."}), 500
+    row = rows[0] if rows else {"answer_length": "adaptive", "response_mode": "advice", "format_mode": "adaptive", "tone": "gentle"}
+    return jsonify({
+        "answerLength": row["answer_length"], "responseMode": row["response_mode"],
+        "formatMode": row["format_mode"], "tone": row["tone"],
+    })
+
+
+@app.route('/api/sessions/<session_id>/feedback', methods=['POST'])
+def message_feedback(session_id):
+    user = require_user()
+    if not isinstance(user, dict):
+        return user
+    data = request.json or {}
+    feedback = data.get("feedback")
+    message_id = data.get("messageId")
+    allowed = {"helpful", "too_vague", "too_long", "not_relevant", "more_detail"}
+    if feedback not in allowed or not message_id:
+        return jsonify({"error": "Valid message feedback is required."}), 400
+    rows, response = supabase_db_request(
+        "POST", "message_feedback", user["token"],
+        payload={"message_id": message_id, "user_id": user["id"], "feedback": feedback},
+    )
+    if rows is None:
+        return jsonify({"error": "Could not save feedback."}), 500
+    return jsonify({"ok": True})
+
+
+@app.route('/api/sessions/<session_id>/summary', methods=['GET'])
+def session_summary(session_id):
+    user = require_user()
+    if not isinstance(user, dict):
+        return user
+    rows, response = supabase_db_request(
+        "GET", "session_summaries", user["token"],
+        params={"session_id": f"eq.{session_id}", "user_id": f"eq.{user['id']}", "select": "summary"},
+    )
+    if rows is None:
+        return jsonify({"error": "Could not load summary."}), 500
+    return jsonify({"summary": rows[0]["summary"] if rows else ""})
+
+
+@app.route('/api/account/export', methods=['GET'])
+def export_account():
+    user = require_user()
+    if not isinstance(user, dict):
+        return user
+    sessions, response = supabase_db_request("GET", "sessions", user["token"], params={"user_id": f"eq.{user['id']}", "select": "*", "order": "created_at.asc"})
+    messages_rows, response = supabase_db_request("GET", "messages", user["token"], params={"user_id": f"eq.{user['id']}", "select": "*", "order": "created_at.asc"})
+    if sessions is None or messages_rows is None:
+        return jsonify({"error": "Could not export account data."}), 500
+    return jsonify({"user": {"id": user["id"], "email": user["email"]}, "sessions": sessions, "messages": messages_rows})
+
+
+@app.route('/api/account', methods=['DELETE'])
+def delete_account():
+    user = require_user()
+    if not isinstance(user, dict):
+        return user
+    for table in ("message_feedback", "session_summaries", "messages", "sessions", "user_preferences"):
+        supabase_db_request("DELETE", table, user["token"], params={"user_id": f"eq.{user['id']}"})
+    if SUPABASE_SECRET_KEY:
+        response = requests.delete(
+            f"{SUPABASE_URL}/auth/v1/admin/users/{user['id']}",
+            headers={"apikey": SUPABASE_SECRET_KEY, "Authorization": f"Bearer {SUPABASE_SECRET_KEY}"},
+            timeout=20,
+        )
+        if not response.ok:
+            return jsonify({"error": "Data was deleted, but the authentication account could not be removed."}), 500
+    return jsonify({"ok": True, "authAccountDeleted": bool(SUPABASE_SECRET_KEY)})
 
 if __name__ == '__main__':
     app.run(

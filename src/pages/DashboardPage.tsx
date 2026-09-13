@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, LogOut, MessageSquare, Mic } from 'lucide-react';
+import { Bot, Download, LogOut, MessageSquare, Mic, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import ChatSidebar from '../components/ChatSidebar';
-import { createSession } from '../services/messageService';
+import { createSession, deleteAccount, exportAccountData, savePreferences } from '../services/messageService';
 import { fetchVoices, playTextToSpeech, type ElevenVoice } from '../services/voiceService';
 import {
   loadAssistantPrefs,
@@ -29,7 +29,8 @@ const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     saveAssistantPrefs(prefs);
-  }, [prefs]);
+    if (user) void savePreferences(prefs).catch((error) => console.error('Preference save error:', error));
+  }, [prefs, user]);
 
   const startConversation = async (mode: 'text' | 'voice') => {
     if (!user) return;
@@ -58,6 +59,28 @@ const DashboardPage: React.FC = () => {
     } finally {
       setPreviewingVoice(false);
     }
+  };
+
+  const updatePreference = <K extends keyof typeof prefs>(key: K, value: (typeof prefs)[K]) => {
+    setPrefs((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleExport = async () => {
+    const data = await exportAccountData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'vent-account-export.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Delete your account and all conversations permanently?')) return;
+    await deleteAccount();
+    await logout();
+    navigate('/');
   };
 
   return (
@@ -123,6 +146,13 @@ const DashboardPage: React.FC = () => {
               )}
             </select>
             {previewingVoice && <p className="text-xs text-muted-navy mb-2 text-left animate-pulse">Previewing this voice...</p>}
+
+            <div className="grid sm:grid-cols-2 gap-3 text-left mt-4">
+              <label className="text-sm text-charcoal">Answer length<select className="form-select w-full mt-1" value={prefs.answerLength} onChange={(e) => updatePreference('answerLength', e.target.value as typeof prefs.answerLength)}><option value="adaptive">Adaptive</option><option value="short">Short</option><option value="detailed">Detailed</option></select></label>
+              <label className="text-sm text-charcoal">Response mode<select className="form-select w-full mt-1" value={prefs.responseMode} onChange={(e) => updatePreference('responseMode', e.target.value as typeof prefs.responseMode)}><option value="advice">Advice</option><option value="listening">Just listen</option></select></label>
+              <label className="text-sm text-charcoal">Format<select className="form-select w-full mt-1" value={prefs.formatMode} onChange={(e) => updatePreference('formatMode', e.target.value as typeof prefs.formatMode)}><option value="adaptive">Adaptive</option><option value="structured">Structured</option><option value="conversational">Conversational</option></select></label>
+              <label className="text-sm text-charcoal">Tone<select className="form-select w-full mt-1" value={prefs.tone} onChange={(e) => updatePreference('tone', e.target.value as typeof prefs.tone)}><option value="gentle">Gentle</option><option value="direct">Direct</option></select></label>
+            </div>
             {voiceError && <p className="text-xs text-amber-800 mb-4 text-left">{voiceError}</p>}
             {startError && <p className="text-xs text-red-700 bg-red-100 border border-red-300 rounded p-3 mb-4 text-left">{startError}</p>}
 
@@ -149,6 +179,10 @@ const DashboardPage: React.FC = () => {
                 <Mic className="w-5 h-5" />
                 {starting === 'voice' ? 'Starting...' : 'Voice chat'}
               </button>
+            </div>
+            <div className="flex justify-center gap-4 mt-6 text-xs text-charcoal opacity-75">
+              <button type="button" onClick={() => void handleExport()} className="inline-flex items-center gap-1 hover:opacity-100"><Download size={14} /> Export data</button>
+              <button type="button" onClick={() => void handleDeleteAccount()} className="inline-flex items-center gap-1 text-red-700 hover:opacity-100"><Trash2 size={14} /> Delete account</button>
             </div>
           </div>
         </main>

@@ -8,9 +8,10 @@ import {
   Message,
   Session,
   fetchSessionMessages,
+  saveMessageFeedback,
   saveSessionMessage,
 } from '../services/messageService';
-import { playTextToSpeech, transcribeAudio } from '../services/voiceService';
+import { playTextToSpeech, stopTextToSpeech, transcribeAudio } from '../services/voiceService';
 import {
   getSessionMode,
   loadAssistantPrefs,
@@ -29,6 +30,7 @@ const ChatPage: React.FC = () => {
   const { user, logout } = useAuth();
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -70,14 +72,15 @@ const ChatPage: React.FC = () => {
         sender: 'user',
         userEmail: activeUser.email,
         sessionId: session.id,
-      });
+      }, assistantPrefs);
       setMessages((prev) => [...prev, savedUserMessage, aiMessage]);
       if (sessionMode === 'voice') {
         lastSpokenAiId.current = aiMessage.id;
+        setIsSpeaking(true);
         speechPlaybackRef.current = playTextToSpeech(aiMessage.text, assistantPrefs.voiceId).catch((err) => {
           console.error(err);
           setSpeechError('Voice playback is unavailable in this browser. You can continue with text chat.');
-        });
+        }).finally(() => setIsSpeaking(false));
       }
     } catch (error) {
       console.error('Error getting AI response:', error);
@@ -139,10 +142,11 @@ const ChatPage: React.FC = () => {
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.sender !== 'ai' || lastMsg.id === lastSpokenAiId.current) return;
     lastSpokenAiId.current = lastMsg.id;
+    setIsSpeaking(true);
     speechPlaybackRef.current = playTextToSpeech(lastMsg.text, assistantPrefs.voiceId).catch((err) => {
       console.error(err);
       setSpeechError('Voice playback is unavailable in this browser. You can continue with text chat.');
-    });
+    }).finally(() => setIsSpeaking(false));
   }, [messages, sessionMode, assistantPrefs.voiceId]);
 
   const handleSessionSelect = (id: string) => {
@@ -186,6 +190,15 @@ const ChatPage: React.FC = () => {
     };
 
     await submitMessage(userMessage.text);
+  };
+
+  const handleFeedback = async (messageId: string, feedback: string) => {
+    if (!sessionId) return;
+    try {
+      await saveMessageFeedback(sessionId, messageId, feedback);
+    } catch (error) {
+      console.error('Feedback error:', error);
+    }
   };
 
   const startRecording = async () => {
@@ -273,6 +286,8 @@ const ChatPage: React.FC = () => {
       mediaRecorderRef.current?.stop();
       return;
     }
+    stopTextToSpeech();
+    setIsSpeaking(false);
     shouldContinueListeningRef.current = true;
     setSpeechError('');
     await speechPlaybackRef.current;
@@ -285,6 +300,8 @@ const ChatPage: React.FC = () => {
     setSessionMode(sessionId, mode);
     setSessionModeState(mode);
   };
+
+  const useTool = (tool: string) => setNewMessage(tool);
 
   return (
     <div className="chat-shell min-h-screen flex flex-col">
@@ -372,7 +389,7 @@ const ChatPage: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {messages.map((message) => (
-                    <ChatMessage key={message.id} message={message} />
+                    <ChatMessage key={message.id} message={message} onFeedback={message.sender === 'ai' ? (feedback) => void handleFeedback(message.id, feedback) : undefined} />
                   ))}
                   {isLoading && (
                     <div className="chat-bubble-ai" style={{ padding: '8px 16px' }}>
@@ -390,6 +407,9 @@ const ChatPage: React.FC = () => {
           </div>
 
           <div className="p-4 bg-white/10 backdrop-blur-sm">
+            <div className="max-w-3xl mx-auto flex flex-wrap gap-2 mb-3">
+              {['Help me organize this', 'Make a plan', 'Challenge this thought', 'Summarize this session', 'Give me a grounding exercise', 'Just listen'].map((tool) => <button key={tool} type="button" onClick={() => useTool(tool)} className="rounded-full border border-black/10 bg-white/60 px-3 py-1 text-xs text-charcoal hover:bg-white">{tool}</button>)}
+            </div>
             <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto flex">
               <input
                 id="message-input"
@@ -429,10 +449,11 @@ const ChatPage: React.FC = () => {
             {sessionMode === 'voice' && (
               <div className="max-w-3xl mx-auto flex items-center mt-2 text-sm text-charcoal">
                 <span className={isListening ? 'text-blue-600 animate-pulse' : ''}>
-                  {isListening ? 'Listening... pause when finished speaking' : 'Tap the mic to start continuous listening'}
+                  {isListening ? 'Listening... pause when finished speaking' : isSpeaking ? 'Speaking... tap the mic to interrupt' : 'Tap the mic to start continuous listening'}
                 </span>
               </div>
             )}
+            <p className="max-w-3xl mx-auto mt-2 text-[11px] text-charcoal opacity-55">VENT offers emotional support and is not a replacement for licensed therapy or emergency care.</p>
             {speechError && (
               <p className="max-w-3xl mx-auto mt-2 text-sm text-red-700 bg-red-50 rounded px-3 py-2">{speechError}</p>
             )}

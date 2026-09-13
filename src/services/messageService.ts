@@ -1,5 +1,6 @@
 import { API_BASE } from './authService';
 import { loadToken } from '../utils/authStorage';
+import type { AssistantPrefs } from '../utils/assistantPrefs';
 
 export interface Message {
   id: string;
@@ -90,13 +91,15 @@ export const fetchSessionMessages = async (sessionId: string): Promise<Message[]
 export const saveSessionMessage = async (
   sessionId: string,
   message: Omit<Message, 'id' | 'timestamp'>
+  , preferences?: AssistantPrefs
 ): Promise<{ userMessage: Message; aiMessage: Message; currentMood?: string }> => {
   try {
     const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
       method: 'POST',
       headers: authHeaders(true),
       body: JSON.stringify({
-        text: message.text
+        text: message.text,
+        preferences,
       })
     });
 
@@ -122,6 +125,31 @@ export const saveSessionMessage = async (
     throw error;
   }
 };
+
+export async function saveMessageFeedback(sessionId: string, messageId: string, feedback: string) {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/feedback`, {
+    method: 'POST', headers: authHeaders(true), body: JSON.stringify({ messageId, feedback }),
+  });
+  if (!response.ok) throw new Error('Could not save feedback');
+}
+
+export async function savePreferences(preferences: AssistantPrefs) {
+  const response = await fetch(`${API_BASE}/api/preferences`, {
+    method: 'PUT', headers: authHeaders(true), body: JSON.stringify(preferences),
+  });
+  if (!response.ok) throw new Error('Could not save preferences');
+}
+
+export async function exportAccountData() {
+  const response = await fetch(`${API_BASE}/api/account/export`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Could not export account data');
+  return response.json();
+}
+
+export async function deleteAccount() {
+  const response = await fetch(`${API_BASE}/api/account`, { method: 'DELETE', headers: authHeaders() });
+  if (!response.ok) throw new Error('Could not delete account');
+}
 
 export const getSessionMood = async (sessionId: string): Promise<string> => {
   try {
