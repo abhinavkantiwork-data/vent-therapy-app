@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { ArrowLeft, Check, LockKeyhole, Sparkles, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, X } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { loadRememberedEmail } from '../utils/authStorage';
 import { isValidEmail, validatePassword } from '../utils/validation';
@@ -13,140 +13,29 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, signup } = useAuth();
-
+  const { login, signup, loginWithGoogle } = useAuth();
   const passwordRules = useMemo(() => validatePassword(password), [password]);
   const emailValid = email.length === 0 || isValidEmail(email);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!isValidEmail(email)) {
-      setError('Enter a valid email address.');
-      return;
-    }
-
-    if (!passwordRules.valid) {
-      setError(`Password must include: ${passwordRules.errors.join(', ')}.`);
-      return;
-    }
-
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault(); setError('');
+    if (!isValidEmail(email)) return setError('Enter a valid email address.');
+    if (!passwordRules.valid) return setError(`Password must include: ${passwordRules.errors.join(', ')}.`);
     setLoading(true);
-    try {
-      if (isLogin) {
-        await login(email, password, rememberMe);
-      } else {
-        await signup(email, password, rememberMe);
-      }
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
+    try { if (isLogin) await login(email, password, rememberMe); else await signup(email, password, rememberMe); navigate('/dashboard'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'An error occurred. Please try again.'); }
+    finally { setLoading(false); }
   };
 
-  const ruleItem = (label: string, ok: boolean) => (
-    <li className={`flex items-center text-xs ${ok ? 'text-green-700' : 'text-gray-600'}`}>
-      {ok ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1 opacity-50" />}
-      {label}
-    </li>
-  );
+  const ruleItem = (label: string, valid: boolean) => <li className={valid ? 'rule-valid' : ''} key={label}>{valid ? <Check size={13} /> : <X size={13} />}{label}</li>;
 
   return (
-    <div className="holographic-bg min-h-screen flex flex-col items-center justify-center px-4">
-      <div className="glass-effect p-8 w-full max-w-md animate-fadeIn">
-        <div className="mb-6">
-          <Link to="/" className="text-black flex items-center opacity-70 hover:opacity-100 transition-opacity">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to home
-          </Link>
-        </div>
-
-        <h1 className="text-2xl font-medium text-black text-center mb-2">ready when you are</h1>
-        <p className="text-black text-center mb-8 opacity-70">your safe space, one convo at a time</p>
-
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-black mb-1">email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={`form-input ${!emailValid ? 'border-red-400' : ''}`}
-              placeholder="you@example.com"
-              required
-              autoComplete="email"
-            />
-            {!emailValid && <p className="text-xs text-red-600 mt-1">Use a valid email format.</p>}
-          </div>
-
-          <div>
-            <label className="block text-black mb-1">password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="form-input"
-              placeholder="password"
-              required
-              autoComplete={isLogin ? 'current-password' : 'new-password'}
-            />
-            <ul className="mt-2 space-y-1 bg-white/40 rounded-lg p-3">
-              {ruleItem('At least 8 characters', password.length >= 8)}
-              {ruleItem('One lowercase letter', /[a-z]/.test(password))}
-              {ruleItem('One uppercase letter', /[A-Z]/.test(password))}
-              {ruleItem('One number', /[0-9]/.test(password))}
-              {ruleItem('One special character', /[^A-Za-z0-9]/.test(password))}
-            </ul>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="rounded"
-            />
-            Remember me on this device
-          </label>
-
-          <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-            {loading ? 'Please wait...' : isLogin ? 'log in' : 'sign up'}
-          </button>
-        </form>
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              setIsLogin(false);
-              setError('');
-            }}
-            className="text-black hover:underline text-sm"
-            style={{ display: isLogin ? 'block' : 'none' }}
-          >
-            don't have an account? sign up
-          </button>
-          <button
-            onClick={() => {
-              setIsLogin(true);
-              setError('');
-            }}
-            className="text-black hover:underline text-sm"
-            style={{ display: isLogin ? 'none' : 'block' }}
-          >
-            already have an account? log in
-          </button>
-        </div>
-      </div>
-    </div>
+    <main className="auth-shell">
+      <div className="auth-aside"><Link to="/" className="brand-mark"><span className="brand-mark-icon"><Sparkles size={16} /></span><span>VENT</span></Link><div className="auth-aside-copy"><p className="eyebrow"><span className="eyebrow-dot" /> A private pause</p><h1>Arrive as you are.</h1><p>There is no right way to begin. A sentence, a feeling, or simply a quiet moment is enough.</p></div><div className="auth-aside-footer"><LockKeyhole size={15} /> Your account keeps your space yours.</div></div>
+      <section className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={16} /> Back to home</Link><div className="auth-form-wrap"><p className="section-kicker">{isLogin ? 'Welcome back' : 'A fresh start'}</p><h2>{isLogin ? 'Good to see you.' : 'Make space for yourself.'}</h2><p className="auth-subtitle">{isLogin ? 'Pick up wherever you left off.' : 'Create a private account in a minute.'}</p>{error && <div className="auth-error" role="alert">{error}</div>}
+        <form onSubmit={handleSubmit} className="auth-form"><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className={!emailValid ? 'input-error' : ''} placeholder="you@example.com" autoComplete="email" required /></label>{!emailValid && <span className="field-error">Use a valid email format.</span>}<label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" autoComplete={isLogin ? 'current-password' : 'new-password'} required /></label>{!isLogin && <ul className="password-rules">{ruleItem('8+ characters', password.length >= 8)}{ruleItem('Lowercase letter', /[a-z]/.test(password))}{ruleItem('Uppercase letter', /[A-Z]/.test(password))}{ruleItem('Number', /[0-9]/.test(password))}{ruleItem('Special character', /[^A-Za-z0-9]/.test(password))}</ul>}<label className="remember-row"><input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} /> Remember me on this device</label><button type="submit" className="primary-action auth-submit" disabled={loading}>{loading ? 'Please wait...' : isLogin ? 'Log in' : 'Create account'}</button></form>
+        <div className="auth-divider"><span>or</span></div><button type="button" onClick={() => void loginWithGoogle()} className="google-action"><span className="google-g">G</span> Continue with Google</button><p className="auth-switch">{isLogin ? "Don't have an account?" : 'Already have an account?'} <button type="button" onClick={() => { setIsLogin(!isLogin); setError(''); }}>{isLogin ? 'Sign up' : 'Log in'}</button></p></div></section>
+    </main>
   );
 };
 

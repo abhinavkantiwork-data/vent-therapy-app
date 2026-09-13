@@ -29,6 +29,14 @@ export function signup(email: string, password: string) {
     });
 }
 
+export async function loginWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}/login` },
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function restoreSession(token: string) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) throw new Error('Session expired.');

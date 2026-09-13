@@ -72,6 +72,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(result.user);
   };
 
+  const loginWithGoogle = async () => {
+    await authService.loginWithGoogle();
+  };
+
   const logout = async () => {
     const token = loadToken();
     if (token) await authService.logout(token);
@@ -84,6 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     login,
     signup,
+    loginWithGoogle,
     logout,
   };
 
