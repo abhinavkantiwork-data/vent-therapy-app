@@ -4,7 +4,7 @@ import { Bot, Download, LogOut, MessageSquare, Mic, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/useAuth';
 import ChatSidebar from '../components/ChatSidebar';
 import { createSession, deleteAccount, exportAccountData, savePreferences } from '../services/messageService';
-import { fetchVoices, playTextToSpeech, type ElevenVoice } from '../services/voiceService';
+import { fetchVoices, playTextToSpeech, stopTextToSpeech, type ElevenVoice } from '../services/voiceService';
 import {
   loadAssistantPrefs,
   saveAssistantPrefs,
@@ -34,6 +34,7 @@ const DashboardPage: React.FC = () => {
 
   const startConversation = async (mode: 'text' | 'voice') => {
     if (!user) return;
+    stopTextToSpeech();
     setStarting(mode);
     setStartError('');
     try {
@@ -49,6 +50,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const previewVoice = async (voiceId: string) => {
+    stopTextToSpeech();
     setPrefs((current) => ({ ...current, voiceId }));
     setPreviewingVoice(true);
     setVoiceError('');

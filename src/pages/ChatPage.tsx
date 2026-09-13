@@ -64,6 +64,8 @@ const ChatPage: React.FC = () => {
     const session = currentSession;
     if (!text.trim() || !activeUser || !session) return;
 
+    stopTextToSpeech();
+    setIsSpeaking(false);
     setNewMessage('');
     setIsLoading(true);
     try {
@@ -123,6 +125,7 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => () => {
     shouldContinueListeningRef.current = false;
+    stopTextToSpeech();
     if (silenceFrameRef.current !== null) cancelAnimationFrame(silenceFrameRef.current);
     mediaRecorderRef.current?.stop();
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -139,7 +142,7 @@ const ChatPage: React.FC = () => {
       console.error(err);
       setSpeechError('Voice playback is unavailable in this browser. You can continue with text chat.');
     }).finally(() => setIsSpeaking(false));
-  }, [messages, sessionMode, assistantPrefs.voiceId]);
+  }, [messages, sessionMode, assistantPrefs.voiceId, isSessionActive]);
 
   const handleSessionSelect = (id: string) => {
     navigate(`/chat/${id}`);
@@ -152,6 +155,10 @@ const ChatPage: React.FC = () => {
 
   const endSession = () => {
     if (!user || !currentSession) return;
+    shouldContinueListeningRef.current = false;
+    mediaRecorderRef.current?.stop();
+    stopTextToSpeech();
+    setIsSpeaking(false);
     setIsSessionActive(false);
     const farewell: Message = {
       id: Date.now().toString(),

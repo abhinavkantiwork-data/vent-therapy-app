@@ -7,6 +7,7 @@ export interface ElevenVoice {
 }
 
 let activeAudio: HTMLAudioElement | null = null;
+let playbackGeneration = 0;
 
 export async function fetchVoices(): Promise<ElevenVoice[]> {
   const response = await fetch(`${API_BASE}/api/voices`);
@@ -19,6 +20,10 @@ export async function fetchVoices(): Promise<ElevenVoice[]> {
 }
 
 export async function playTextToSpeech(text: string, voiceId: string): Promise<void> {
+  const generation = ++playbackGeneration;
+  activeAudio?.pause();
+  activeAudio = null;
+  window.speechSynthesis?.cancel();
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/api/tts`, {
@@ -27,15 +32,22 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
       body: JSON.stringify({ text, voiceId }),
     });
   } catch {
+    if (generation !== playbackGeneration) return;
     await speakWithBrowser(text);
     return;
   }
+  if (generation !== playbackGeneration) return;
   if (!response.ok) {
+    if (generation !== playbackGeneration) return;
     await speakWithBrowser(text);
     return;
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
+  if (generation !== playbackGeneration) {
+    URL.revokeObjectURL(url);
+    return;
+  }
   const audio = new Audio(url);
   activeAudio = audio;
   try {
@@ -51,6 +63,7 @@ export async function playTextToSpeech(text: string, voiceId: string): Promise<v
 }
 
 export function stopTextToSpeech() {
+  playbackGeneration += 1;
   activeAudio?.pause();
   activeAudio = null;
   window.speechSynthesis?.cancel();
