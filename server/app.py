@@ -92,19 +92,7 @@ def current_user():
             )
             if response.status_code == 200:
                 data = response.json()
-                email = data.get("email", "").strip().lower()
-                with get_db() as connection:
-                    existing_user = connection.execute(
-                        "SELECT id, email FROM users WHERE email = ?", (email,)
-                    ).fetchone()
-                    if existing_user is not None:
-                        return {"id": existing_user["id"], "email": existing_user["email"]}
-                    user = {"id": data["id"], "email": email}
-                    connection.execute(
-                        "INSERT OR IGNORE INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
-                        (user["id"], user["email"], "supabase-managed", datetime.now().isoformat()),
-                    )
-                return user
+                return {"id": data["id"], "email": data.get("email", "").strip().lower(), "token": token}
         except requests.RequestException as exc:
             print(f"Supabase auth exception: {exc}")
         return None
@@ -122,6 +110,26 @@ def require_user():
     if user is None:
         return jsonify({"error": "Authentication required"}), 401
     return user
+
+
+def supabase_db_request(method, table, token, params=None, payload=None):
+    response = requests.request(
+        method,
+        f"{SUPABASE_URL}/rest/v1/{table}",
+        headers={
+            "apikey": SUPABASE_PUBLISHABLE_KEY,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        },
+        params=params,
+        json=payload,
+        timeout=20,
+    )
+    if not response.ok:
+        print(f"Supabase database error: {response.status_code} {response.text[:500]}")
+        return None, response
+    return response.json() if response.content else [], response
 
 
 init_db()
@@ -474,6 +482,19 @@ def create_session():
         return user
     session_id = str(uuid.uuid4())
     now = datetime.now().isoformat()
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        rows, response = supabase_db_request(
+            "POST", "sessions", user["token"],
+            payload={"id": session_id, "user_id": user["id"], "title": "New Session"},
+        )
+        if rows is None:
+            return jsonify({"error": "Could not create a persistent session."}), 500
+        session = rows[0]
+        return jsonify({
+            "id": session["id"], "userEmail": user["email"],
+            "createdAt": session["created_at"], "lastActivity": session["last_activity"],
+            "title": session["title"],
+        })
     with get_db() as connection:
         connection.execute(
             "INSERT INTO sessions (id, user_id, user_email, created_at, last_activity, title) VALUES (?, ?, ?, ?, ?, ?)",
@@ -486,6 +507,17 @@ def get_sessions():
     user = require_user()
     if not isinstance(user, (sqlite3.Row, dict)):
         return user
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        rows, response = supabase_db_request(
+            "GET", "sessions", user["token"],
+            params={"user_id": f"eq.{user['id']}", "select": "id,title,created_at,last_activity", "order": "last_activity.desc"},
+        )
+        if rows is None:
+            return jsonify({"error": "Could not load conversation history."}), 500
+        return jsonify([{
+            "id": row["id"], "userEmail": user["email"], "createdAt": row["created_at"],
+            "lastActivity": row["last_activity"], "title": row["title"],
+        } for row in rows])
     with get_db() as connection:
         rows = connection.execute(
             "SELECT id, user_email, created_at, last_activity, title FROM sessions WHERE user_id = ? ORDER BY last_activity DESC",
@@ -501,6 +533,25 @@ def get_session_messages(session_id):
     user = require_user()
     if not isinstance(user, (sqlite3.Row, dict)):
         return user
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        sessions, response = supabase_db_request(
+            "GET", "sessions", user["token"],
+            params={"id": f"eq.{session_id}", "user_id": f"eq.{user['id']}", "select": "id"},
+        )
+        if sessions is None:
+            return jsonify({"error": "Could not load the session."}), 500
+        if not sessions:
+            return jsonify({"error": "Session not found"}), 404
+        rows, response = supabase_db_request(
+            "GET", "messages", user["token"],
+            params={"session_id": f"eq.{session_id}", "user_id": f"eq.{user['id']}", "select": "id,text,sender,created_at,session_id", "order": "created_at.asc"},
+        )
+        if rows is None:
+            return jsonify({"error": "Could not load session messages."}), 500
+        return jsonify([{
+            "id": row["id"], "text": row["text"], "sender": row["sender"],
+            "timestamp": row["created_at"], "userEmail": user["email"], "sessionId": row["session_id"],
+        } for row in rows])
     with get_db() as connection:
         session = connection.execute("SELECT id FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"])).fetchone()
         if session is None:
@@ -522,6 +573,48 @@ def add_session_message(session_id):
     text = data['text'].strip()
     if not text:
         return jsonify({"error": "Message text required"}), 400
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        sessions, response = supabase_db_request(
+            "GET", "sessions", user["token"],
+            params={"id": f"eq.{session_id}", "user_id": f"eq.{user['id']}", "select": "id"},
+        )
+        if sessions is None:
+            return jsonify({"error": "Could not access the session."}), 500
+        if not sessions:
+            return jsonify({"error": "Session not found"}), 404
+        previous_rows, response = supabase_db_request(
+            "GET", "messages", user["token"],
+            params={"session_id": f"eq.{session_id}", "user_id": f"eq.{user['id']}", "select": "text,sender", "order": "created_at.asc"},
+        )
+        if previous_rows is None:
+            return jsonify({"error": "Could not load message history."}), 500
+        now = datetime.now().isoformat()
+        user_message = {
+            "id": str(uuid.uuid4()), "text": text, "sender": "user", "timestamp": now,
+            "userEmail": user["email"], "sessionId": session_id,
+        }
+        history = previous_rows + [{"text": text, "sender": "user"}]
+        ai_response_text = get_ai_response(history, user["email"])
+        ai_message = {
+            "id": str(uuid.uuid4()), "text": ai_response_text, "sender": "ai",
+            "timestamp": datetime.now().isoformat(), "userEmail": user["email"], "sessionId": session_id,
+        }
+        message_rows, response = supabase_db_request(
+            "POST", "messages", user["token"],
+            payload=[
+                {"id": user_message["id"], "session_id": session_id, "user_id": user["id"], "text": text, "sender": "user"},
+                {"id": ai_message["id"], "session_id": session_id, "user_id": user["id"], "text": ai_response_text, "sender": "ai"},
+            ],
+        )
+        if message_rows is None:
+            return jsonify({"error": "Could not save the message."}), 500
+        title = text[:50] + ("..." if len(text) > 50 else "")
+        supabase_db_request(
+            "PATCH", "sessions", user["token"],
+            params={"id": f"eq.{session_id}", "user_id": f"eq.{user['id']}"},
+            payload={"last_activity": ai_message["timestamp"], "title": title},
+        )
+        return jsonify({"userMessage": user_message, "aiMessage": ai_message})
     with get_db() as connection:
         session = connection.execute("SELECT * FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"])).fetchone()
         if session is None:
@@ -555,6 +648,14 @@ def delete_session(session_id):
     user = require_user()
     if not isinstance(user, (sqlite3.Row, dict)):
         return user
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        rows, response = supabase_db_request(
+            "DELETE", "sessions", user["token"],
+            params={"id": f"eq.{session_id}", "user_id": f"eq.{user['id']}"},
+        )
+        if response.status_code not in (200, 204):
+            return jsonify({"error": "Could not delete the session."}), 500
+        return jsonify({"message": "Session deleted successfully"})
     with get_db() as connection:
         result = connection.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user["id"]))
         if result.rowcount == 0:
